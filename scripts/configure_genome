@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+
+# -----------------------------------------------------------------------------
+# Copyright (c) 2014--, The Qiita Development Team.
+#
+# Distributed under the terms of the BSD 3-clause License.
+#
+# The full license is in the file LICENSE, distributed with this software.
+# -----------------------------------------------------------------------------
+
+import click
+
+from qtp_genome import plugin
+
+
+@click.command()
+@click.option('--env-script', prompt='Environment script',
+              default='source activate qtp-genome')
+@click.option('--server-cert', prompt='Server certificate', default='None')
+@click.argument('plugincoupling', required=False, default='filesystem')
+def config(env_script, server_cert, plugincoupling):
+    """Generates the Qiita configuration files"""
+    if server_cert == 'None':
+        server_cert = None
+    plugin.generate_config(env_script, 'start_genome', server_cert=server_cert,
+                           plugin_coupling=plugincoupling)
+
+if __name__ == '__main__':
+    config()

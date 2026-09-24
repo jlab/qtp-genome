@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qtp-genome"
+version = "0.1.0"
+description = "A type plugin for Qiita"
+requires-python = ">=3.9"
+dependencies = [
+    "click",
+    "qiita-client @ https://github.com/qiita-spots/qiita_client/archive/master.zip",
+]
