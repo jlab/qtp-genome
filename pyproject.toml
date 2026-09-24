@@ -16,5 +16,12 @@ dependencies = [
 configure_genome = "scripts.configure_genome:config"
 start_genome = "scripts.start_genome:execute"
 
+[project.scripts]
+configure_genome = "scripts.configure_genome:config"
+start_genome = "scripts.start_genome:main"
+
 [tool.setuptools.packages.find]
-include = ["scripts*"]
+include = [
+    "qtp_genome*",
+    "scripts*",
+]
