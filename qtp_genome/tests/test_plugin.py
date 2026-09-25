@@ -1,5 +1,5 @@
 from unittest import main
-from os import close, remove, chmod
+from os import close, remove, chmod, makedirs
 from shutil import copyfile, rmtree
 from tempfile import mkstemp, mkdtemp
 from json import dumps, load
@@ -18,25 +18,9 @@ from qtp_genome.validate import (
 
 class genomeTests(PluginTestCase):
     def setUp(self):
-        # this will allow us to see the full errors
-        self.maxDiff = None
-
-        plugin("https://localhost:8383", 'register', 'ignored')
-        self.params = {
-            'Positive filtering database': 'default',
-            'Negative filtering database': 'default',
-            'Mean per nucleotide error rate': 0.005,
-            'Error probabilities for each Hamming distance': (
-                '1, 0.06, 0.02, 0.02, 0.01, 0.005, 0.005, '
-                '0.005, 0.001, 0.001, 0.001, 0.0005'),
-            'Insertion/deletion (indel) probability': 0.01,
-            'Maximum number of insertion/deletion (indel)': 3,
-            'Sequence trim length (-1 for no trimming)': 100,
-            'Minimum dataset-wide read threshold': 0,
-            'Minimum per-sample read threshold': 2,
-            'Threads per sample': 1, 'Jobs to start': 1,
-            'Reference phylogeny for SEPP': 'Greengenes_13.8'}
-        self._clean_up_files = []
+        self.out_dir = mkdtemp()
+        self._clean_up_files = [self.out_dir]
+        makedirs(self.base_data_dir, exist_ok=True)
 
     def tearDown(self):
         for fp in self._clean_up_files:
