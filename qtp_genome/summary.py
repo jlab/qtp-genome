@@ -75,12 +75,6 @@ def generate_html_summary(qclient, job_id, parameters, out_dir):
     with open(of_fp, 'w') as of:
         of.write(createHTML(df_assemblystats, df_contigstats, df_annotstats, annots))
 
-    with open('/stefan.txt', 'a') as f:
-        #print("prep_id", prep_id, file=f)
-        print("files", files, file=f)
-        #print("a_type", a_type, file=f)
-        print("==========================", file=f)
-
     success = True
     error_msg = ""
     try:
