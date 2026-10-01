@@ -67,6 +67,7 @@ def generate_html_summary(qclient, job_id, parameters, out_dir):
     curr_step += 1
     df_contigstats = collect_contig_stats(qclient, job_id, curr_step, num_steps, files, True)
 
+    df_annotstats, annots = None, None
     if has_annotations:
         curr_step += 1
         df_annotstats, annots = collect_annotation_stats(qclient, job_id, curr_step, num_steps, files, True)
