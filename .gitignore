@@ -1,0 +1,12 @@
+# Virtual environments
+.venv/
+venv/
+
+# Installation and build metadata
+*.egg-info/
+build/
+dist/
+
+# Python cache
+__pycache__/
+*.pyc
