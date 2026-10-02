@@ -110,7 +110,7 @@ def validate(qclient, job_id, parameters, out_dir):
         The artifact information, if successful
         The error message, if not successful
     """
-    prep_id = parameters['template']  # obtain numeric ID from qiita's preparation
+    prep_ids = parameters['template']  # obtain numeric IDs from qiita's preparation(s); can be multiple in case that RNAseq data are provided as a second input
     files = loads(parameters['files'])  # obtain information about artifact files
     a_type = parameters['artifact_type']  # obtain artifact type
 
@@ -123,8 +123,10 @@ def validate(qclient, job_id, parameters, out_dir):
     # given the prep ID, obtain prep data
     curr_step = 1
     qclient.update_job_step(job_id, "Step %s of %i: Collecting prep information" % (curr_step, num_steps))
-    prep_info = qclient.get("/qiita_db/prep_template/%s/data/" % prep_id)
-    prep_info = prep_info['data']
+    prep_infos = []
+    for prep_id in prep_ids:
+        pinfo = qclient.get("/qiita_db/prep_template/%s/data/" % prep_id)
+        prep_infos.append(pinfo)
 
     # ASSEMBLY, GENERAL STATS
     curr_step += 1
