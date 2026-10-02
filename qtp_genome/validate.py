@@ -110,7 +110,15 @@ def validate(qclient, job_id, parameters, out_dir):
         The artifact information, if successful
         The error message, if not successful
     """
-    prep_ids = parameters['template']  # obtain numeric IDs from qiita's preparation(s); can be multiple in case that RNAseq data are provided as a second input
+    # obtain numeric IDs from qiita's preparation(s):
+    # Can be multiple, i.e. a list in case that RNAseq data are provided as
+    # a second input for processing via e.g. qp-cofanpi
+    # Or a single one. Then, the datatype is a single int. We therefore convert
+    # here to a list of one element.
+    prep_ids = parameters['template']
+    if not isinstance(prep_ids, list):
+        prep_ids = [prep_ids]
+
     files = loads(parameters['files'])  # obtain information about artifact files
     a_type = parameters['artifact_type']  # obtain artifact type
 
