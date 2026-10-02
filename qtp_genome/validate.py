@@ -124,9 +124,9 @@ def validate(qclient, job_id, parameters, out_dir):
 
     # determine number of total steps (less if no annotation is provided)
     has_annotations = 'annotation' in files.keys()
-    num_steps = 2
+    num_steps = 3
     if has_annotations:
-        num_steps += 3
+        num_steps += 2
 
     # given the prep ID, obtain prep data
     curr_step = 1
