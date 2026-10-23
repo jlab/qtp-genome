@@ -15,7 +15,7 @@ def createHTML(df_assemblystats, df_contigstats, df_annotstats=None, custom_anno
         for col in sorted(custom_annotations.columns):
             html += custom_annotations[col].value_counts().to_frame().to_html(index=True)
 
-    html += "</html></body>\n"
+    html += "</body></html>\n"
 
     return html
 
@@ -51,26 +51,29 @@ def generate_html_summary(qclient, job_id, parameters, out_dir):
 
     # determine number of total steps (less if no annotation is provided)
     has_annotations = 'annotation' in files.keys()
-    num_steps = 2
+    num_steps = 3
     if has_annotations:
-        num_steps += 3
+        num_steps += 1
 
     # given the prep ID, obtain prep data
     curr_step = 1
     qclient.update_job_step(job_id, "Step %s of %i: Collecting prep information" % (curr_step, num_steps))
 
-    # ASSEMBLY, GENERAL STATS
-    curr_step += 1
-    df_assemblystats = collect_assembly_stats(qclient, job_id, curr_step, num_steps, files, True)
-
-    # ASSEMBLY, STATS ON CONTIG LEVELS
-    curr_step += 1
-    df_contigstats = collect_contig_stats(qclient, job_id, curr_step, num_steps, files, True)
-
-    df_annotstats, annots = None, None
-    if has_annotations:
+    try:
+        # ASSEMBLY, GENERAL STATS
         curr_step += 1
-        df_annotstats, annots = collect_annotation_stats(qclient, job_id, curr_step, num_steps, files, True)
+        df_assemblystats = collect_assembly_stats(qclient, job_id, curr_step, num_steps, files, True)
+
+        # ASSEMBLY, STATS ON CONTIG LEVELS
+        curr_step += 1
+        df_contigstats = collect_contig_stats(qclient, job_id, curr_step, num_steps, files, True)
+
+        df_annotstats, annots = None, None
+        if has_annotations:
+            curr_step += 1
+            df_annotstats, annots = collect_annotation_stats(qclient, job_id, curr_step, num_steps, files, True)
+    except (ValueError, OSError) as e:
+        return False, None, str(e)
 
     of_fp = os.path.join(out_dir, "artifact_%d.html" % artifact_id)
     with open(of_fp, 'w') as of:

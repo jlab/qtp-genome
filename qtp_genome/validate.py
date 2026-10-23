@@ -34,36 +34,41 @@ def collect_contig_stats(qclient, job_id, curr_step, num_steps, files, return_ta
 
     if return_table:
         # read STDOUT as pandas DataFrame
-        df_contigstats = pd.read_csv(StringIO(result.stdout), sep="\t").sort_values(by='length', ascending=False)
+        df_contigstats = pd.read_csv(StringIO(result.stdout), sep="\t", converters={0: str}).sort_values(by='length', ascending=False)
         return df_contigstats
 
 
 def count_custom_gff3_keys(fp):
-    """Parses 8th column of a GFF file, expands the keys and returns as table."""
+    """Parses the 9th GFF3 column, expands the keys and returns as table."""
 
     FILTER_KEYS = ["ID", "Parent", "Name", "Dbxref"]
 
-    gffkeyvalues = pd.read_csv(fp, sep="\t", usecols=[8]).iloc[:, 0]
+    try:
+        chunks = pd.read_csv(
+            fp, sep="\t", comment="#", header=None, usecols=[8], chunksize=10000)
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
 
-    # split key-value pairs along ;
-    pairs = (
-        gffkeyvalues.str.split(";")
-            .explode()
-            .str.split("=", n=1, expand=True)
-    )
-    pairs.columns = ["key", "value"]
-    attributes_df = pairs.pivot(columns="key", values="value")
+    tables = []
+    with chunks:
+        for chunk in chunks:
+            # Split attributes before pivoting, retaining only custom keys.
+            pairs = (
+                chunk.iloc[:, 0].str.split(";")
+                    .explode()
+                    .str.split("=", n=1, expand=True)
+                    .reindex(columns=[0, 1])
+                    .dropna(subset=[1])
+            )
+            pairs.columns = ["key", "value"]
+            pairs = pairs[~pairs['key'].isin(FILTER_KEYS)]
+            attributes_df = pairs.pivot(columns="key", values="value")
+            attributes_df = attributes_df.dropna(how='all', axis=1)
+            attributes_df = attributes_df.dropna(how='all', axis=0)
+            if not attributes_df.empty:
+                tables.append(attributes_df)
 
-    # filter default keys
-    attributes_df = attributes_df[[c for c in attributes_df if c not in FILTER_KEYS]]
-
-    # drop keys if all values are NaN
-    attributes_df = attributes_df.dropna(how='all', axis=1)
-
-    # drop annotations if all values are NaN
-    attributes_df = attributes_df.dropna(how='all', axis=0)
-
-    return attributes_df
+    return pd.concat(tables) if tables else pd.DataFrame()
 
 
 def collect_annotation_stats(qclient, job_id, curr_step, num_steps, files, return_tables=False):
@@ -81,7 +86,8 @@ def collect_annotation_stats(qclient, job_id, curr_step, num_steps, files, retur
             r" \(total length: (\d+)\)\n",
             r"\ntotal length: \1\n",
             result.stdout)
-        df_annotstats = pd.read_csv(StringIO(stats), sep=":")
+        df_annotstats = pd.read_csv(
+            StringIO(stats), sep=":", header=None, names=["statistic", "count"])
 
         # obtain number of custom key annotations
         annots = count_custom_gff3_keys(files['annotation'][0])
@@ -140,14 +146,15 @@ def validate(qclient, job_id, parameters, out_dir):
     curr_step += 1
     try:
         collect_assembly_stats(qclient, job_id, curr_step, num_steps, files, False)
-    except ValueError as e:
+    except (ValueError, OSError) as e:
         return False, None, str(e)
 
     # ASSEMBLY, STATS ON CONTIG LEVELS
     curr_step += 1
     try:
-        collect_contig_stats(qclient, job_id, curr_step, num_steps, files, False)
-    except ValueError as e:
+        df_contigstats = collect_contig_stats(
+            qclient, job_id, curr_step, num_steps, files, has_annotations)
+    except (ValueError, OSError) as e:
         return False, None, str(e)
 
     # ANNOTATIONS
@@ -155,25 +162,23 @@ def validate(qclient, job_id, parameters, out_dir):
         curr_step += 1
         try:
             collect_annotation_stats(qclient, job_id, curr_step, num_steps, files, False)
-        except ValueError as e:
+        except (ValueError, OSError) as e:
             return False, None, str(e)
 
         # ANNOTATION & ASSEMBLY
         curr_step += 1
         qclient.update_job_step(job_id, "Step %i of %i: Matching annotation vs. assembly" % (curr_step, num_steps))
-        cmd = 'comm -23 <(grep -v "^#" "%s" | cut -f 1 | sort -u) <(grep "^>" "%s" | cut -b 2- | sort -u)' % (files['annotation'][0], files['assembly'][0])
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            executable="/bin/bash",
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        if result.returncode != 0:
-            return False, None, "Error at step %i: Comparison of GFF and fasta contig names failed:\n%s" % (curr_step, result.stderr)
-        if result.stdout != "":
-            return False, None, "Error at step %i: Your GFF file '%s' contains the following contigs, which are missing in your fasta file '%s':\n%s" % (curr_step, os.path.basename(files['annotation'][0]), os.path.basename(files['assembly'][0]), result.stderr)
+        annotation_ids = set()
+        with open(files['annotation'][0]) as annotation:
+            for line in annotation:
+                if line.startswith('##FASTA'):
+                    break
+                if line.startswith('#') or not line.strip():
+                    continue
+                annotation_ids.add(line.split('\t', 1)[0])
+        missing_ids = sorted(annotation_ids - set(df_contigstats.iloc[:, 0]))
+        if missing_ids:
+            return False, None, "Error at step %i: Your GFF file '%s' contains the following contigs, which are missing in your fasta file '%s':\n%s" % (curr_step, os.path.basename(files['annotation'][0]), os.path.basename(files['assembly'][0]), '\n'.join(missing_ids))
 
     # prepare existing files for this artifact
     newfiles = [(fp, key)
