@@ -32,6 +32,8 @@ def test_real_validation_and_summary(require_tools, genome_files, qclient, tmp_p
     assert '<th>product</th>' in html
     assert 'enzyme' in html
     assert '<td>parsed genome node DAGs</td>' in html
+    assert '<td>N/A</td>' in html
+    assert '0 of 1 assembly sequences have no GFF3 feature rows' in html
 
 
 @pytest.mark.parametrize('invalid_coordinates', [False, True])

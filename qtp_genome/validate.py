@@ -95,6 +95,19 @@ def collect_annotation_stats(qclient, job_id, curr_step, num_steps, files, retur
         return df_annotstats, annots
 
 
+def _annotation_contig_ids(fp):
+    """Read feature sequence IDs after GenomeTools has validated the GFF3."""
+    annotation_ids = set()
+    with open(fp) as annotation:
+        for line in annotation:
+            if line.startswith('##FASTA'):
+                break
+            if line.startswith('#') or not line.strip():
+                continue
+            annotation_ids.add(line.split('\t', 1)[0])
+    return annotation_ids
+
+
 def validate(qclient, job_id, parameters, out_dir):
     """Validate and fix a new Genome artifact
 
@@ -168,14 +181,7 @@ def validate(qclient, job_id, parameters, out_dir):
         # ANNOTATION & ASSEMBLY
         curr_step += 1
         qclient.update_job_step(job_id, "Step %i of %i: Matching annotation vs. assembly" % (curr_step, num_steps))
-        annotation_ids = set()
-        with open(files['annotation'][0]) as annotation:
-            for line in annotation:
-                if line.startswith('##FASTA'):
-                    break
-                if line.startswith('#') or not line.strip():
-                    continue
-                annotation_ids.add(line.split('\t', 1)[0])
+        annotation_ids = _annotation_contig_ids(files['annotation'][0])
         missing_ids = sorted(annotation_ids - set(df_contigstats.iloc[:, 0]))
         if missing_ids:
             return False, None, "Error at step %i: Your GFF file '%s' contains the following contigs, which are missing in your fasta file '%s':\n%s" % (curr_step, os.path.basename(files['annotation'][0]), os.path.basename(files['assembly'][0]), '\n'.join(missing_ids))
