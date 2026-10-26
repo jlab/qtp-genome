@@ -115,6 +115,8 @@ jobs:
           cp -v patch.sql `pwd`/qiita-dev/qiita_db/support_files/patches/96.sql
           cp -v patch.sql `pwd`/qiita-dev/qiita_db/support_files/patches/test_db_sql/96.sql
 
+          find / -iname "*.sql"
+
           echo "3. Setting up qiita"
           qiita-env make --no-load-ontologies
           qiita plugins update
