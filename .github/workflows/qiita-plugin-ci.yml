@@ -130,7 +130,7 @@ jobs:
           export PYTHONWARNINGS="ignore:Certificate for localhost has no \`subjectAltName\`"
           export ENVIRONMENT="source /home/runner/.profile; conda activate qtp-genome"
 
-          pytest qtp-genome --doctest-modules --cov=qtp-genome --cov-report=lcov --ignore=qtp-genome/data
+          pytest qtp_genome --doctest-modules --cov=qtp_genome --cov-report=lcov --ignore=qtp_genome/data
 
       - uses: codecov/codecov-action@v3
         with:
