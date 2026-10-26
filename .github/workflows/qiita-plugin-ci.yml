@@ -112,6 +112,9 @@ jobs:
           nginx -c ${NGINX_FILE_NEW}
 
           echo "copy DB patch into qiita main for re-population of DB"
+          echo "pwd ist: "
+          pwd
+          ls -la ../
           cp -v qtp-genome/patch.sql `pwd`/qiita-dev/qiita_db/support_files/patches/96.sql
 
           echo "3. Setting up qiita"
