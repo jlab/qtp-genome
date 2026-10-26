@@ -115,8 +115,6 @@ jobs:
           cp -v patch.sql $CONDA_PREFIX/lib/python3.9/site-packages/qiita_db/support_files/patches/96.sql
           cp -v patch.sql $CONDA_PREFIX/lib/python3.9/site-packages/qiita_db/support_files/patches/96.sql
 
-          find / -iname "*.sql"
-
           echo "3. Setting up qiita"
           qiita-env make --no-load-ontologies
           qiita plugins update
