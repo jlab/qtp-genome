@@ -116,7 +116,19 @@ jobs:
           qiita plugins update
           qiita-test-install
 
-          echo "4. Starting supervisord => multiple qiita instances"
+          echo "3b. Applying qtp-genome DB patch"
+          export PGPASSWORD=postgres
+          psql -h localhost -p ${{ job.services.postgres.ports[5432] }} -U postgres -d qiita_test -v ON_ERROR_STOP=1 <<'EOF'
+          -- Sep 25, 2026
+          -- Introduce two new file types for qtp-genome
+          INSERT INTO qiita.filepath_type (filepath_type) VALUES ('assembly')
+          ON CONFLICT (filepath_type) DO NOTHING;
+
+          INSERT INTO qiita.filepath_type (filepath_type) VALUES ('annotation')
+          ON CONFLICT (filepath_type) DO NOTHING;
+          EOF
+
+          echo "5. Starting supervisord => multiple qiita instances"
           supervisord -c ${PWD}/qiita-dev/qiita_pet/supervisor_example.conf
           sleep 10
           cat /tmp/supervisord.log
