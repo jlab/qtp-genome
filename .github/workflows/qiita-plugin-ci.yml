@@ -112,8 +112,8 @@ jobs:
           nginx -c ${NGINX_FILE_NEW}
 
           echo "copy DB patch into qiita main for re-population of DB"
-          cp -v patch.sql `pwd`/qiita-dev/qiita_db/support_files/patches/96.sql
-          cp -v patch.sql `pwd`/qiita-dev/qiita_db/support_files/patches/test_db_sql/96.sql
+          cp -v patch.sql $CONDA_PREFIX/lib/python3.9/site-packages/qiita_db/support_files/patches/96.sql
+          cp -v patch.sql $CONDA_PREFIX/lib/python3.9/site-packages/qiita_db/support_files/patches/96.sql
 
           find / -iname "*.sql"
 
