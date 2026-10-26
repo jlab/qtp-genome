@@ -115,7 +115,7 @@ jobs:
           echo "pwd ist: "
           pwd
           ls -la ../
-          cp -v qtp-genome/patch.sql `pwd`/qiita-dev/qiita_db/support_files/patches/96.sql
+          cp -v patch.sql `pwd`/qiita-dev/qiita_db/support_files/patches/96.sql
 
           echo "3. Setting up qiita"
           qiita-env make --no-load-ontologies
