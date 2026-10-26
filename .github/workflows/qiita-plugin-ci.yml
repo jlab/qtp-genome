@@ -75,7 +75,7 @@ jobs:
         shell: bash -l {0}
         run: |
           conda config --add channels bioconda
-          conda create -q --yes -n qtp-genome python=3.11 seqkit genometools-genometools gffread
+          conda create -q --yes -n qtp-genome python=3.11 seqkit genometools-genometools gffread pytest
 
           conda activate qtp-genome
 
