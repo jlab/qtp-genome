@@ -1,9 +1,10 @@
-# name: Qiita Plugin CI
+name: Qiita Plugin CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   # derived from https://github.com/actions/example-services/blob/master/.github/workflows/postgres-service.yml
@@ -32,10 +33,10 @@ jobs:
     steps:
       # Downloads a copy of the code in your repository before running CI tests
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
 
       - name: Setup for conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v4
         with:
           auto-update-conda: true
           python-version: "3.11"
@@ -51,7 +52,7 @@ jobs:
           unzip dev.zip
 
           # pull out the port so we can modify the configuration file easily
-          pgport=${{ job.services.postgres.ports[5432] }}
+          pgport=${{ job.services.postgres.ports['5432'] }}
           sed -i "s/PORT = 5432/PORT = $pgport/" qiita-dev/qiita_core/support_files/config_test.cfg
 
           # PGPASSWORD is read by pg_restore, which is called by the build_db process.
@@ -113,7 +114,6 @@ jobs:
 
           echo "copy DB patch into qiita main for re-population of DB"
           cp -v patch.sql $CONDA_PREFIX/lib/python3.9/site-packages/qiita_db/support_files/patches/96.sql
-          cp -v patch.sql $CONDA_PREFIX/lib/python3.9/site-packages/qiita_db/support_files/patches/96.sql
 
           echo "3. Setting up qiita"
           qiita-env make --no-load-ontologies
@@ -122,7 +122,18 @@ jobs:
 
           echo "4. Starting supervisord => multiple qiita instances"
           supervisord -c ${PWD}/qiita-dev/qiita_pet/supervisor_example.conf
-          sleep 10
+          for port in 21174 21175 21176 21177 8383; do
+            echo "Waiting for Qiita on https://localhost:${port}/"
+            if ! curl --fail --silent --show-error \
+              --cacert "$QIITA_ROOTCA_CERT" \
+              --connect-timeout 2 --max-time 5 \
+              --retry 30 --retry-delay 2 --retry-max-time 120 \
+              --retry-connrefused --retry-all-errors \
+              --output /dev/null "https://localhost:${port}/"; then
+              cat /tmp/supervisord.log
+              exit 1
+            fi
+          done
           cat /tmp/supervisord.log
 
       - name: qtp-genome
@@ -136,7 +147,7 @@ jobs:
 
           pytest qtp_genome --doctest-modules --cov=qtp_genome --cov-report=lcov --ignore=qtp_genome/data
 
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -144,13 +155,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: ruff
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v7
         with:
           python-version: 3.9
       - name: install dependencies
         run: python -m pip install --upgrade pip
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
       - name: lint
         run: |
           pip install -q ruff
