@@ -16,7 +16,7 @@ pytestmark = pytest.mark.integration
 def require_tools():
     missing = [tool for tool in ('seqkit', 'gt') if which(tool) is None]
     if missing:
-        pytest.skip('Required executable(s) missing: %s' % ', '.join(missing))
+        pytest.skip(f'Required executable(s) missing: {", ".join(missing)}')
 
 
 def test_real_validation_and_summary(require_tools, genome_files, qclient, tmp_path):

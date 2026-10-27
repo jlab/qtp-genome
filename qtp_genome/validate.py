@@ -1,21 +1,24 @@
-from . import ARTIFACT_TYPE
-from json import loads
-import pandas as pd
-from io import StringIO
 import os
 import re
-from qiita_client import ArtifactInfo
 import subprocess
+from io import StringIO
+from json import loads
+
+import pandas as pd
+from qiita_client import ArtifactInfo
+
+from . import ARTIFACT_TYPE
 
 
 def collect_assembly_stats(qclient, job_id, curr_step, num_steps, files, return_table=False):
-    qclient.update_job_step(job_id, "Step %i of %i: Collecting assembly statistics" % (curr_step, num_steps))
+    qclient.update_job_step(job_id, f"Step {curr_step:d} of {num_steps:d}: Collecting assembly statistics")
     result = subprocess.run(
         ["seqkit", "stats", "--basename", "--all", "-T", files['assembly'][0]],
+        check=False,
         capture_output=True,
         text=True)
     if result.returncode != 0:
-        raise ValueError("Error at step %i: Your assembly file '%s' is invalid:\n%s" % (curr_step, os.path.basename(files['assembly'][0]), result.stderr))
+        raise ValueError(f"Error at step {curr_step:d}: Your assembly file '{os.path.basename(files['assembly'][0])!s}' is invalid:\n{result.stderr!s}")
 
     if return_table:
         # read STDOUT as pandas DataFrame
@@ -24,13 +27,14 @@ def collect_assembly_stats(qclient, job_id, curr_step, num_steps, files, return_
 
 
 def collect_contig_stats(qclient, job_id, curr_step, num_steps, files, return_table=False):
-    qclient.update_job_step(job_id, "Step %i of %i: Collecting contig statistics" % (curr_step, num_steps))
+    qclient.update_job_step(job_id, f"Step {curr_step:d} of {num_steps:d}: Collecting contig statistics")
     result = subprocess.run(
         ["seqkit", "fx2tab", "--header-line", "--name", "--only-id", "--length", "--alphabet", "--base-content", "A", "--base-content", "C", "--base-content", "G", "--base-content", "T", "--gc", "--seq-hash", files['assembly'][0]],
+        check=False,
         capture_output=True,
         text=True)
     if result.returncode != 0:
-        raise ValueError("Error at step %i: Your assembly file '%s' is invalid:\n%s" % (curr_step, os.path.basename(files['assembly'][0]), result.stderr))
+        raise ValueError(f"Error at step {curr_step:d}: Your assembly file '{os.path.basename(files['assembly'][0])!s}' is invalid:\n{result.stderr!s}")
 
     if return_table:
         # read STDOUT as pandas DataFrame
@@ -72,13 +76,14 @@ def count_custom_gff3_keys(fp):
 
 
 def collect_annotation_stats(qclient, job_id, curr_step, num_steps, files, return_tables=False):
-    qclient.update_job_step(job_id, "Step %i of %i: Collecting annotation statistics" % (curr_step, num_steps))
+    qclient.update_job_step(job_id, f"Step {curr_step:d} of {num_steps:d}: Collecting annotation statistics")
     result = subprocess.run(
         ["gt", "stat", files['annotation'][0]],
+        check=False,
         capture_output=True,
         text=True)
     if result.returncode != 0:
-        raise ValueError("Error at step %i: Your annotation file '%s' is invalid:\n%s" % (curr_step, os.path.basename(files['annotation'][0]), result.stderr))
+        raise ValueError(f"Error at step {curr_step:d}: Your annotation file '{os.path.basename(files['annotation'][0])!s}' is invalid:\n{result.stderr!s}")
 
     if return_tables:
         # read STDOUT as pandas DataFrame
@@ -139,20 +144,20 @@ def validate(qclient, job_id, parameters, out_dir):
         prep_ids = [prep_ids]
 
     files = loads(parameters['files'])  # obtain information about artifact files
-    a_type = parameters['artifact_type']  # obtain artifact type
+    _ = parameters['artifact_type']  # obtain artifact type
 
     # determine number of total steps (less if no annotation is provided)
-    has_annotations = 'annotation' in files.keys()
+    has_annotations = 'annotation' in files
     num_steps = 3
     if has_annotations:
         num_steps += 2
 
     # given the prep ID, obtain prep data
     curr_step = 1
-    qclient.update_job_step(job_id, "Step %s of %i: Collecting prep information" % (curr_step, num_steps))
+    qclient.update_job_step(job_id, f"Step {curr_step!s} of {num_steps:d}: Collecting prep information")
     prep_infos = []
     for prep_id in prep_ids:
-        pinfo = qclient.get("/qiita_db/prep_template/%s/data/" % prep_id)
+        pinfo = qclient.get(f"/qiita_db/prep_template/{prep_id!s}/data/")
         prep_infos.append(pinfo)
 
     # ASSEMBLY, GENERAL STATS
@@ -180,15 +185,16 @@ def validate(qclient, job_id, parameters, out_dir):
 
         # ANNOTATION & ASSEMBLY
         curr_step += 1
-        qclient.update_job_step(job_id, "Step %i of %i: Matching annotation vs. assembly" % (curr_step, num_steps))
+        qclient.update_job_step(job_id, f"Step {curr_step:d} of {num_steps:d}: Matching annotation vs. assembly")
         annotation_ids = _annotation_contig_ids(files['annotation'][0])
         missing_ids = sorted(annotation_ids - set(df_contigstats.iloc[:, 0]))
         if missing_ids:
-            return False, None, "Error at step %i: Your GFF file '%s' contains the following contigs, which are missing in your fasta file '%s':\n%s" % (curr_step, os.path.basename(files['annotation'][0]), os.path.basename(files['assembly'][0]), '\n'.join(missing_ids))
+            missing_contigs = '\n'.join(missing_ids)
+            return False, None, f"Error at step {curr_step:d}: Your GFF file '{os.path.basename(files['annotation'][0])!s}' contains the following contigs, which are missing in your fasta file '{os.path.basename(files['assembly'][0])!s}':\n{missing_contigs}"
 
     # prepare existing files for this artifact
     newfiles = [(fp, key)
-                for key in files.keys()
+                for key in files
                 for fp in files[key]]
 
     return True, [ArtifactInfo(None, ARTIFACT_TYPE, newfiles)], ""

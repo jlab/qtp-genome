@@ -30,7 +30,7 @@ def qclient(genome_files):
             return {'files': {
                 key: [{'filepath': path} for path in paths]
                 for key, paths in genome_files.items()}}
-        raise AssertionError('Unexpected Qiita API URL: %s' % url)
+        raise AssertionError(f'Unexpected Qiita API URL: {url!s}')
 
     client.get.side_effect = get
     return client
@@ -42,14 +42,14 @@ def tool_runner(monkeypatch):
     def run(command, **kwargs):
         if command[:2] == ['seqkit', 'stats']:
             output = ('file\tformat\ttype\tnum_seqs\tsum_len\n'
-                      '%s\tFASTA\tDNA\t1\t12\n' % Path(command[-1]).name)
+                      f'{Path(command[-1]).name!s}\tFASTA\tDNA\t1\t12\n')
         elif command[:2] == ['seqkit', 'fx2tab']:
             output = '#id\tlength\ncontig_1\t12\n'
         elif command[:2] == ['gt', 'stat']:
             output = ('parsed genome node DAGs: 1\n'
                       'sequence regions: 1 (total length: 12)\ngenes: 1\n')
         else:
-            raise AssertionError('Unexpected external command: %r' % command)
+            raise AssertionError(f'Unexpected external command: {command!r}')
         return CompletedProcess(command, 0, stdout=output, stderr='')
 
     runner = Mock(side_effect=run)

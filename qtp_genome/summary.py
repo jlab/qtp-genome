@@ -1,12 +1,16 @@
-import pandas as pd
-from json import loads
+import logging
 import os
 from html import escape
 from urllib.parse import unquote
-from .validate import (
-    collect_assembly_stats, collect_contig_stats, collect_annotation_stats,
-    _annotation_contig_ids)
 
+import pandas as pd
+
+from .validate import (
+    _annotation_contig_ids,
+    collect_annotation_stats,
+    collect_assembly_stats,
+    collect_contig_stats,
+)
 
 _REPORT_CSS = """
 * { box-sizing: border-box; }
@@ -51,15 +55,15 @@ footer { border-top: 1px solid #dce4e9; margin-top: 28px; padding-top: 14px; }
 
 def _metric_strip(items):
     return '<div class="metrics">' + ''.join(
-        '<div class="metric"><span class="metric-label">%s</span>'
-        '<span class="metric-value">%s</span></div>' % (escape(label), escape(value))
+        f'<div class="metric"><span class="metric-label">{escape(label)}</span>'
+        f'<span class="metric-value">{escape(value)}</span></div>'
         for label, value in items) + '</div>\n'
 
 
 def _details_table(title, table, index=False):
-    return ('<details><summary>%s</summary><div class="table-wrap" '
-            'role="region" aria-label="%s" tabindex="0">%s</div></details>\n') % (
-                escape(title), escape(title), table.to_html(index=index, border=0))
+    return (f'<details><summary>{escape(title)}</summary><div class="table-wrap" '
+            f'role="region" aria-label="{escape(title)}" tabindex="0">'
+            f'{table.to_html(index=index, border=0)}</div></details>\n')
 
 
 def createHTML(df_assemblystats, df_contigstats, df_annotstats=None, custom_annotations=None,
@@ -86,7 +90,7 @@ def createHTML(df_assemblystats, df_contigstats, df_annotstats=None, custom_anno
             '<header><div class="eyebrow">GENOME REPORT</div><h1>Genome summary</h1>')
     subtitle = ', '.join(df_assemblystats['file'].astype(str)) if 'file' in df_assemblystats else (
         'Assembly statistics and annotation feature counts')
-    html += '<div class="subtitle">%s</div></header>\n<h2>Assembly overview</h2>\n' % escape(subtitle)
+    html += f'<div class="subtitle">{escape(subtitle)}</div></header>\n<h2>Assembly overview</h2>\n'
     if len(df_assemblystats) == 1:
         row = df_assemblystats.iloc[0]
         html += _metric_strip([
@@ -100,12 +104,11 @@ def createHTML(df_assemblystats, df_contigstats, df_annotstats=None, custom_anno
     if has_fasta and quality_columns:
         html += '<p class="note">FASTA contains no per-base quality scores; quality metrics are shown as N/A.</p>\n'
     html += _details_table('Complete assembly statistics', assembly)
-    html += _details_table('Assembly sequences (%s)' % format(len(contigs), ','), contigs)
+    html += _details_table(f'Assembly sequences ({len(contigs):,})', contigs)
     if df_annotstats is not None or custom_annotations is not None:
         html += '<h2>Annotation statistics</h2>\n<p>GFF3 coordinates are 1-based, inclusive.</p>\n'
         if unannotated_contigs is not None:
-            html += '<p>%d of %d assembly sequences have no GFF3 feature rows.</p>\n' % (
-                unannotated_contigs, len(df_contigstats))
+            html += f'<p>{unannotated_contigs:d} of {len(df_contigstats):d} assembly sequences have no GFF3 feature rows.</p>\n'
     if df_annotstats is not None:
         annotation_stats = df_annotstats.copy()
         if 'statistic' in annotation_stats:
@@ -133,8 +136,7 @@ def createHTML(df_assemblystats, df_contigstats, df_annotstats=None, custom_anno
             counts = values.value_counts().rename_axis(col).to_frame(name=count_label)
             title = {'Ontology_term': 'Ontology terms', 'ec_number': 'Enzyme Commission numbers',
                      'note': 'Annotation notes', 'product': 'Products'}.get(col, col)
-            html += _details_table('%s (%s distinct values)' % (
-                title, format(len(counts), ',')), counts, index=True)
+            html += _details_table(f'{title!s} ({len(counts):,} distinct values)', counts, index=True)
 
     html += ('<footer>Lengths are in base pairs (bp). Base composition is shown as percentages. '
              'GFF3 coordinates are 1-based, inclusive.</footer></main></body></html>\n')
@@ -164,7 +166,7 @@ def generate_html_summary(qclient, job_id, parameters, out_dir):
     """
     # Step 1: gather file information from qiita using REST api
     artifact_id = parameters['input_data']
-    qclient_url = "/qiita_db/artifacts/%s/" % artifact_id
+    qclient_url = f"/qiita_db/artifacts/{artifact_id!s}/"
     artifact_info = qclient.get(qclient_url)
 
     # obtain information about artifact files
@@ -172,14 +174,14 @@ def generate_html_summary(qclient, job_id, parameters, out_dir):
              for k, v in artifact_info['files'].items()}
 
     # determine number of total steps (less if no annotation is provided)
-    has_annotations = 'annotation' in files.keys()
+    has_annotations = 'annotation' in files
     num_steps = 3
     if has_annotations:
         num_steps += 1
 
     # given the prep ID, obtain prep data
     curr_step = 1
-    qclient.update_job_step(job_id, "Step %s of %i: Collecting prep information" % (curr_step, num_steps))
+    qclient.update_job_step(job_id, f"Step {curr_step!s} of {num_steps:d}: Collecting prep information")
 
     try:
         # ASSEMBLY, GENERAL STATS
@@ -199,7 +201,7 @@ def generate_html_summary(qclient, job_id, parameters, out_dir):
     except (ValueError, OSError) as e:
         return False, None, str(e)
 
-    of_fp = os.path.join(out_dir, "artifact_%d.html" % artifact_id)
+    of_fp = os.path.join(out_dir, f"artifact_{artifact_id:d}.html")
     with open(of_fp, 'w', encoding='utf-8') as of:
         of.write(createHTML(df_assemblystats, df_contigstats, df_annotstats, annots,
                             unannotated_contigs))
@@ -209,6 +211,7 @@ def generate_html_summary(qclient, job_id, parameters, out_dir):
     try:
         qclient.patch(qclient_url, 'add', '/html_summary/', value=of_fp)
     except Exception as e:
+        logging.getLogger(__name__).exception("Failed to register the genome HTML summary")
         success = False
         error_msg = str(e)
 

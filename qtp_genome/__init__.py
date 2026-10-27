@@ -1,10 +1,9 @@
 ARTIFACT_TYPE = 'genome'
 
-from qiita_client import QiitaTypePlugin, QiitaArtifactType
+from qiita_client import QiitaArtifactType, QiitaTypePlugin
 
-from .validate import validate
 from .summary import generate_html_summary
-
+from .validate import validate
 
 # Define the supported artifact types
 artifact_types = [

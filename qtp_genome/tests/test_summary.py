@@ -61,7 +61,7 @@ def test_generate_and_register_summary(
         '/qiita_db/artifacts/1/', 'add', '/html_summary/', value=str(output))
     total = 4 if with_annotations else 3
     steps = [call.args[1] for call in qclient.update_job_step.call_args_list]
-    assert all(message.startswith('Step %d of %d:' % (index, total))
+    assert all(message.startswith(f'Step {index:d} of {total:d}:')
                for index, message in enumerate(steps, 1))
     assert len(steps) == total
 
