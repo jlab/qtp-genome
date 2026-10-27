@@ -1,128 +1,90 @@
-# -----------------------------------------------------------------------------
-# Copyright (c) 2014--, The Qiita Development Team.
-#
-# Distributed under the terms of the BSD 3-clause License.
-#
-# The full license is in the file LICENSE, distributed with this software.
-# -----------------------------------------------------------------------------
-
-from unittest import main
-from tempfile import mkstemp, mkdtemp
-from os import close, remove, mkdir
-from os.path import exists, isdir, join, basename
-from shutil import rmtree
+"""Validation contracts using real parsers and simulated external tools."""
+import importlib
 from json import dumps
-from functools import partial
+from pathlib import Path
+from subprocess import CompletedProcess
 
-import numpy as np
-from qiita_client import ArtifactInfo
-from qiita_client.testing import PluginTestCase
+import pytest
 
-from qtp_genome.validate import (
-    collect_assembly_stats, collect_contig_stats, count_custom_gff3_keys,
-    collect_annotation_stats, validate)
+validation = importlib.import_module('qtp_genome.validate')
 
 
-class CreateTests(PluginTestCase):
-    def setUp(self):
-        self.out_dir = mkdtemp()
-        self._clean_up_files = [self.out_dir]
+@pytest.mark.parametrize('with_annotations', [False, True])
+def test_validate_returns_artifact_files(
+        with_annotations, genome_files, qclient, tool_runner, tmp_path):
+    if not with_annotations:
+        genome_files.pop('annotation')
+    success, artifacts, error = validation.validate(
+        qclient, 'job', {'template': 1, 'artifact_type': 'genome',
+                        'files': dumps(genome_files)}, str(tmp_path))
 
-    def tearDown(self):
-        for fp in self._clean_up_files:
-            if exists(fp):
-                if isdir(fp):
-                    rmtree(fp)
-                else:
-                    remove(fp)
-
-    def collect_assembly_stats(self):
-        # # Create a new job
-        # fp_support_files = join('qtp_biom', 'support_files')
-        # filepaths = {'biom': [join(fp_support_files, 'sepp.biom')],
-        #              'preprocessed_fasta': [join(fp_support_files, 'sepp.fa')],
-        #              'plain_text': [join(fp_support_files, 'sepp.tre')]}
-        # parameters = {'template': 1,
-        #               'files': dumps(filepaths),
-        #               'artifact_type': 'BIOM',
-        #               'analysis': 1}
-        # data = {'command': dumps(['BIOM type', '2.1.4 - Qiime2', 'Validate']),
-        #         'parameters': dumps(parameters),
-        #         'status': 'running'}
-        # res = self.qclient.post('/apitest/processing_job/', data=data)
-        # job_id = res['job']
-
-        # # test validation on valid data
-        # obs_success, obs_ainfo, obs_error = validate(
-        #     self.qclient, job_id, parameters, self.out_dir)
-        # self.assertTrue(obs_success)
-        # for ft, fp in filepaths.items():
-        #     self.assertTrue((fp[0], ft) in obs_ainfo[0].files)
-        # self.assertEqual(obs_error, '')
-
-        # # test that validation failes if tree is no Newick file, i.e. not
-        # # parsable by skbio
-        # filepaths['plain_text'] = [join(fp_support_files, 'sepp.fa')]
-        # parameters = {'template': 1,
-        #               'files': dumps(filepaths),
-        #               'artifact_type': 'BIOM',
-        #               'analysis': 1}
-        # data = {'command': dumps(['BIOM type', '2.1.4 - Qiime2', 'Validate']),
-        #         'parameters': dumps(parameters),
-        #         'status': 'running'}
-        # res = self.qclient.post('/apitest/processing_job/', data=data)
-        # job_id = res['job']
-        # # test validation on valid data
-        # obs_success, obs_ainfo, obs_error = validate(
-        #     self.qclient, job_id, parameters, self.out_dir)
-        # self.assertFalse(obs_success)
-        # self.assertEqual(obs_ainfo, None)
-        # self.assertEqual(
-        #     obs_error, 'Phylogenetic tree cannot be parsed via scikit-biom')
-        pass
-
-    # def _create_job_and_biom(self, sample_ids, template=None, analysis=None):
-    #     # Create the BIOM table that needs to be valdiated
-    #     fd, biom_fp = mkstemp(suffix=".biom")
-    #     close(fd)
-    #     data = np.random.randint(100, size=(2, len(sample_ids)))
-    #     table = Table(data, ['O1', 'O2'], sample_ids)
-    #     with biom_open(biom_fp, 'w') as f:
-    #         table.to_hdf5(f, "Test")
-    #     self._clean_up_files.append(biom_fp)
-
-    #     # Create a new job
-    #     parameters = {'template': template,
-    #                   'files': dumps({'biom': [biom_fp]}),
-    #                   'artifact_type': 'BIOM',
-    #                   'analysis': analysis}
-    #     data = {'command': dumps(['BIOM type', '2.1.4 - Qiime2', 'Validate']),
-    #             'parameters': dumps(parameters),
-    #             'status': 'running'}
-    #     res = self.qclient.post('/apitest/processing_job/', data=data)
-    #     job_id = res['job']
-
-    #     return biom_fp, job_id, parameters
-
-    def test_collect_contig_stats(self):
-        # sample_ids = ['1.SKM4.640180', '1.SKB8.640193', '1.SKD8.640184',
-        #               '1.SKM9.640192', '1.SKB7.640196']
-        # biom_fp, job_id, parameters = self._create_job_and_biom(
-        #     sample_ids, analysis=1)
-        # obs_success, obs_ainfo, obs_error = validate(
-        #     self.qclient, job_id, parameters, self.out_dir)
-        # exp_fp = partial(join, self.out_dir)
-        # exp_index_fp = exp_fp('index.html')
-        # exp_viz_fp = exp_fp('support_files')
-        # exp_qza_fp = exp_fp('feature-table.qza')
-        # self.assertTrue(obs_success)
-        # self.assertEqual(
-        #     obs_ainfo, [ArtifactInfo(None, 'BIOM', [
-        #         (biom_fp, 'biom'), (exp_index_fp, 'html_summary'),
-        #         (exp_viz_fp, 'html_summary_dir'), (exp_qza_fp, 'qza')])])
-        # self.assertEqual(obs_error, "")
-        pass
+    assert success
+    assert error == ''
+    assert len(artifacts) == 1
+    assert set(artifacts[0].files) == {
+        (path, kind) for kind, paths in genome_files.items() for path in paths}
+    assert tool_runner.call_count == (3 if with_annotations else 2)
 
 
-if __name__ == '__main__':
-    main()
+def test_missing_contig_error_lists_ids(genome_files, qclient, tool_runner, tmp_path):
+    annotation = Path(genome_files['annotation'][0])
+    annotation.write_text(annotation.read_text().replace('contig_1', 'missing'))
+    success, artifacts, error = validation.validate(
+        qclient, 'job', {'template': 1, 'artifact_type': 'genome',
+                        'files': dumps(genome_files)}, str(tmp_path))
+
+    assert not success
+    assert artifacts is None
+    assert error.endswith('\nmissing')
+    assert tool_runner.call_count == 3
+
+
+@pytest.mark.parametrize('stage', [('seqkit', 'stats'), ('seqkit', 'fx2tab'), ('gt', 'stat')])
+@pytest.mark.parametrize('missing_tool', [False, True])
+def test_tool_failures_return_error(
+        stage, missing_tool, genome_files, qclient, tool_runner, tmp_path):
+    run = tool_runner.side_effect
+
+    def fail(command, **kwargs):
+        if tuple(command[:2]) == stage:
+            if missing_tool:
+                raise FileNotFoundError('tool unavailable')
+            return CompletedProcess(command, 1, stdout='', stderr='tool rejected input')
+        return run(command, **kwargs)
+
+    tool_runner.side_effect = fail
+    success, artifacts, error = validation.validate(
+        qclient, 'job', {'template': 1, 'artifact_type': 'genome',
+                        'files': dumps(genome_files)}, str(tmp_path))
+
+    assert not success
+    assert artifacts is None
+    assert ('tool unavailable' if missing_tool else 'tool rejected input') in error
+
+
+def test_collect_assembly_statistics(genome_files, qclient, tool_runner):
+    table = validation.collect_assembly_stats(qclient, 'job', 1, 1, genome_files, True)
+
+    assert table['num_seqs'].tolist() == [1]
+    assert table['sum_len'].tolist() == [12]
+
+
+def test_contigs_keep_ids_and_sort_by_numeric_length(genome_files, qclient, tool_runner):
+    tool_runner.side_effect = None
+    tool_runner.return_value = CompletedProcess(
+        [], 0, stdout='#id\tlength\n001\t9\n002\t12\n', stderr='')
+    table = validation.collect_contig_stats(qclient, 'job', 1, 1, genome_files, True)
+
+    assert table.iloc[:, 0].tolist() == ['002', '001']
+    assert table['length'].tolist() == [12, 9]
+
+
+def test_annotation_statistics_preserve_every_metric(genome_files, qclient, tool_runner):
+    stats, annotations = validation.collect_annotation_stats(
+        qclient, 'job', 1, 1, genome_files, True)
+
+    assert list(stats.columns) == ['statistic', 'count']
+    assert dict(zip(stats['statistic'], stats['count'])) == {
+        'parsed genome node DAGs': 1, 'sequence regions': 1,
+        'total length': 12, 'genes': 1}
+    assert annotations['product'].tolist() == ['enzyme']

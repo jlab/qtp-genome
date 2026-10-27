@@ -9,8 +9,16 @@ description = "A type plugin for Qiita"
 requires-python = ">=3.9"
 dependencies = [
     "click",
+    "pandas",
     "qiita-client @ https://github.com/qiita-spots/qiita_client/archive/master.zip",
 ]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["qtp_genome/tests"]
+markers = ["integration: requires the seqkit and gt executables"]
 
 [tool.setuptools]
 script-files = [
