@@ -1,5 +1,6 @@
 import logging
 import os
+from binascii import crc32
 from html import escape
 from urllib.parse import unquote
 
@@ -66,8 +67,22 @@ def _details_table(title, table, index=False):
             f'{table.to_html(index=index, border=0)}</div></details>\n')
 
 
+def _source_file_checksums(files):
+    """Calculate CRC32 over exact file bytes using bounded reads."""
+    rows = []
+    for file_type in ('assembly', 'annotation'):
+        for fp in files.get(file_type, []):
+            checksum = 0
+            with open(fp, 'rb') as source:
+                for chunk in iter(lambda: source.read(1024 * 1024), b''):
+                    checksum = crc32(chunk, checksum)
+            rows.append({'File type': file_type, 'Filename': os.path.basename(fp),
+                         'CRC32': f'{checksum:08x}'})
+    return pd.DataFrame(rows, columns=['File type', 'Filename', 'CRC32'])
+
+
 def createHTML(df_assemblystats, df_contigstats, df_annotstats=None, custom_annotations=None,
-               unannotated_contigs=None):
+               unannotated_contigs=None, provenance=None):
     assembly = df_assemblystats.copy()
     quality_columns = [column for column in ('Q20(%)', 'Q30(%)', 'AvgQual')
                        if column in assembly]
@@ -90,7 +105,16 @@ def createHTML(df_assemblystats, df_contigstats, df_annotstats=None, custom_anno
             '<header><div class="eyebrow">GENOME REPORT</div><h1>Genome summary</h1>')
     subtitle = ', '.join(df_assemblystats['file'].astype(str)) if 'file' in df_assemblystats else (
         'Assembly statistics and annotation feature counts')
-    html += f'<div class="subtitle">{escape(subtitle)}</div></header>\n<h2>Assembly overview</h2>\n'
+    html += f'<div class="subtitle">{escape(subtitle)}</div></header>\n'
+    if provenance is not None:
+        study_id = provenance['study_id']
+        study_label = str(study_id) if study_id is not None else 'Not available'
+        html += ('<h2>Report provenance</h2>\n'
+                 f'<p>Qiita study ID: <strong>{escape(study_label)}</strong> &middot; '
+                 f'Qiita artifact ID: <strong>{escape(str(provenance["artifact_id"]))}</strong></p>\n')
+        html += _details_table('Source files and CRC32 checksums', provenance['files'])
+        html += '<p class="subtitle">CRC32 checksums are calculated from the exact source file bytes.</p>\n'
+    html += '<h2>Assembly overview</h2>\n'
     if len(df_assemblystats) == 1:
         row = df_assemblystats.iloc[0]
         html += _metric_strip([
@@ -175,7 +199,7 @@ def generate_html_summary(qclient, job_id, parameters, out_dir):
 
     # determine number of total steps (less if no annotation is provided)
     has_annotations = 'annotation' in files
-    num_steps = 3
+    num_steps = 4
     if has_annotations:
         num_steps += 1
 
@@ -198,13 +222,18 @@ def generate_html_summary(qclient, job_id, parameters, out_dir):
             df_annotstats, annots = collect_annotation_stats(qclient, job_id, curr_step, num_steps, files, True)
             annotation_ids = _annotation_contig_ids(files['annotation'][0])
             unannotated_contigs = len(set(df_contigstats.iloc[:, 0]) - annotation_ids)
+
+        curr_step += 1
+        qclient.update_job_step(job_id, f"Step {curr_step:d} of {num_steps:d}: Calculating file checksums")
+        provenance = {'artifact_id': artifact_id, 'study_id': artifact_info.get('study'),
+                      'files': _source_file_checksums(files)}
     except (ValueError, OSError) as e:
         return False, None, str(e)
 
     of_fp = os.path.join(out_dir, f"artifact_{artifact_id:d}.html")
     with open(of_fp, 'w', encoding='utf-8') as of:
         of.write(createHTML(df_assemblystats, df_contigstats, df_annotstats, annots,
-                            unannotated_contigs))
+                            unannotated_contigs, provenance=provenance))
 
     success = True
     error_msg = ""

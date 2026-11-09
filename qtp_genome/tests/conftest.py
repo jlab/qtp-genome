@@ -27,7 +27,7 @@ def qclient(genome_files):
         if url == '/qiita_db/prep_template/1/data/':
             return {}
         if url == '/qiita_db/artifacts/1/':
-            return {'files': {
+            return {'study': 42, 'files': {
                 key: [{'filepath': path} for path in paths]
                 for key, paths in genome_files.items()}}
         raise AssertionError(f'Unexpected Qiita API URL: {url!s}')
